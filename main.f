@@ -59,23 +59,27 @@
       integer iphotext, iphotext2
       integer isyn,icompt,igg,issa,iesc,ipsc
       integer ianni
+      integer ielefree,isynfree,ielefesc,iaccfree !          **** by HZ
       integer tarray
       real*8 npdec
       character*1 relabs
-	
+
 !     PARAMETERS USED IN d02ejf ROUTINE 
       PARAMETER(npmax=400,ntotal=800,nwork=440350,relabs='M')
-	
+
 !     PHYSICAL CONSTANTS        
       PARAMETER(sthom=6.65e-25,c=3.e10,elrms=1.6e-12*.511e6,
      $ prms=1.6e-12*938.257e6, 
-     $ pi=3.14159265,boltz=1.38e-16,astbo=7.56e-15,Bcr=4.4e13) 
+!    $ pi=3.14159265,boltz=1.38e-16,astbo=7.56e-15,Bcr=4.4e13)
+     $ pi=3.14159265,boltz=1.38e-16,astbo=7.56e-15,Bcr=4.4e13,!** by HZ
+     $ e=4.803e-10) !                                        **** by HZ
              
 !     ARRAY DEFINITIONS
       DIMENSION tarray(3)
       DIMENSION y(ntotal),yp(npmax),ye(npmax),yg(npmax)
      $         ,gp(npmax),ge(npmax),x(npmax),work(nwork)
-     $         ,ygamma(ntotal),ygbb(npmax) 
+     $         ,ygamma(ntotal),ygbb(npmax)
+     $         ,ge2(npmax),ye2(npmax) !                      **** by HZ 
 
 !     DECLARATION OF SUBROUTINES      
       external out
@@ -99,130 +103,145 @@
      $ ap,iprext,ipexp  
       common/elexterbr/geextbr,slelints1,slelints2,ae2,ielextbr 
       common/prexterbr/gpextbr,slprints1,slprints2,ap2,iprextbr 
-      common/ebb/ygbb,nbbmx	
+      common/ebb/ygbb,nbbmx
       common/tvv/iprcl 
       common/pgp/radius,xl10min,bfield
-      
+      common/elefree/ge2inj,qefree,tfesc,gprimeacc, !        **** by HZ
+     $ ielefree,iaccfree,isynfree,ielefesc !                 **** by HZ
+
       call cpu_time (t_start)
- 
       call itime(tarray)
       tt1=tarray(1)*3600.+tarray(2)*60.+tarray(3)
  
-      open (unit=13, file='input.inp', status='old')
+      open (unit=13, file='code_hao.inp', status='old')
       open (unit=98, file='code_r4.dat', status='unknown')       
       open (unit=99, file='dum_r4.dat', status='unknown') 
 
 !     READING THE INPUT FILE
       read (13,*) ireadin,npdec,nsteps,nout,tend
-      read (13,*) gpexmx,ypmin,yemin,ygmin,tol
+!     read (13,*) gpexmx,ypmin,yemin,ygmin,tol
+      read (13,*) gpexmx,ypmin,yemin,ygmin,ye2min,tol !      **** by HZ
       read (13,*) slpinj,sleinj,slginj
-      read (13,*) radius, bfield
+      read (13,*) radius,bfield
       read (13,*) iprext,gpextmn,gpextmx,slprints,exlumpr,bpresc,
      $ ap,ipexp
       read (13,*) ielext,geextmn,geextmx,slelints,exlumel,belesc,
      $ ae,ieexp
       read (13,*) iphotext,temperat,exlumth
       read (13,*) iphotext2,x1,x2,xbr,beta1,beta2,extph0
-      read (13,*) ielextbr,geextbr,slelints1,slelints2,ae2	
+      read (13,*) ielextbr,geextbr,slelints1,slelints2,ae2
       read (13,*) iprextbr,gpextbr,slprints1,slprints2,ap2
-      read (13,*) isyn, iprsyn, issa 
-      read (13,*) icompt, ikn, igg, ianni, iesc, ipsc
- 
-      
-      if (ielextbr.gt.0) ielext=0      	
-      if (iprextbr.gt.0) iprext=0	
- 
-	geextbr=10.**geextbr
-	gpextbr=10.**gpextbr		
-	gpextmn=10.**gpextmn
-	gpextmx=10.**gpextmx
-	geextmn=10.**geextmn
-	geextmx=10.**geextmx
-	exlumel=10.**exlumel
-	exlumpr=10.**exlumpr
+      read (13,*) isyn,iprsyn,issa 
+      read (13,*) icompt,ikn,igg,ianni,iesc,ipsc
+      read (13,*) ielefree,isynfree,ge2inj,qefree,ielefesc, !**** by HZ
+     $ tfesc,iaccfree,frecn !                                **** by HZ 
+      if (ielextbr.gt.0) ielext=0      
+      if (iprextbr.gt.0) iprext=0
 
-!       dimensionless B field	
-	q=bfield/Bcr
-!       magnetic energy density [erg/cm^3]	
-	UB=Bfield**2./8./pi
-!       magnetic compactness	
-	tb=sthom*UB*radius/elrms
-!       co-moving isotropic-equivalent electron injection luminosity [erg/s]
-        xLeinj=exlumel*4.*pi*radius*elrms*c/sthom
-!       co-moving isotropic-equivalent proton injection luminosity [erg/s]
-        xLpinj=exlumpr*4.*pi*radius*prms*c/sthom
-          
-        write(6,*) 'B [G], UB [erg/cm^3], R [cm]'
-	write (6,1000) Bfield,UB,Radius
-	write(6,*) 'Le,inj [erg/s], Lp,inj [erg/s]'
-        write(6,1000) xLeinj, xLpinj 
+      gprimeacc=frecn*e*bfield*radius/elrms !                     **** by HZ
+
+      geextbr=10.**geextbr
+      gpextbr=10.**gpextbr
+      gpextmn=10.**gpextmn
+      gpextmx=10.**gpextmx
+      geextmn=10.**geextmn
+      geextmx=10.**geextmx
+      exlumel=10.**exlumel
+      exlumpr=10.**exlumpr
+
+!     dimensionless B field	
+      q=bfield/Bcr
+!     magnetic energy density [erg/cm^3]	
+      UB=Bfield**2./8./pi
+!     magnetic compactness	
+      tb=sthom*UB*radius/elrms
+!     co-moving isotropic-equivalent electron injection luminosity [erg/s]
+      xLeinj=exlumel*4.*pi*radius*elrms*c/sthom
+!     co-moving isotropic-equivalent proton injection luminosity [erg/s]
+      xLpinj=exlumpr*4.*pi*radius*prms*c/sthom
+
+      paraA = gprimeacc/(radius/c)
+      paraT = tfesc*(radius/c)
+      paraR = 4.*sthom*c*UB/elrms/3.
+      write(6,*) 'A, T, R [cgs]'
+      write(6,1000) paraA, paraT, paraR
+
+
+      write(6,*) 'B [G], UB [erg/cm^3], R [cm]'
+      write (6,1000) Bfield,UB,Radius
+      write(6,*) 'Le,inj [erg/s], Lp,inj [erg/s]'
+      write(6,1000) xLeinj, xLpinj 
         
-!       For blackbody	
-	xbb=temperat*boltz/elrms
-	yglbb=exlumth
-	bblum=4*pi*radius*elrms*c/sthom
-	Ubb=bblum/4./pi/radius**2/c
-	Ubbrl=astbo*temperat**4
+!     For blackbody	
+      xbb=temperat*boltz/elrms
+      yglbb=exlumth
+      bblum=4*pi*radius*elrms*c/sthom
+      Ubb=bblum/4./pi/radius**2/c
+      Ubbrl=astbo*temperat**4
 
-!       Normalization factors         
-        factor=tb*q**(-5./3.)/1836.1
-	xnorm=tb*q**(-5./3.)
-	
-	
+!     Normalization factors         
+      factor=tb*q**(-5./3.)/1836.1
+      xnorm=tb*q**(-5./3.)
+
+
       if (ireadin.eq.0) then
-      write(98,1002)ireadin,npdec,nsteps,tend
-      write(98,1005)gpexmn,gpexmx,xexmn,tol 
-      write(98,1005)slpinj,sleinj,slginj
-      write(98,1000)bplus,tb,q,radius
-      write(98,1000)ypmin,yemin,ygmin
-      write(98,1001)iphotext,temperat,exlumth
-      write(98,1001)iphotext2,x1,x2,xbr,beta1,beta2,extph0
-      write(98,1003)isyn, iprsyn, issa
-      write(98,1003)icompt, ikn, igg, ianni, iesc, ipsc      
+        write(98,1002)ireadin,npdec,nsteps,tend
+        write(98,1005)gpexmn,gpexmx,xexmn,tol 
+        write(98,1005)slpinj,sleinj,slginj
+        write(98,1000)bplus,tb,q,radius
+!       write(98,1000)ypmin,yemin,ygmin
+        write(98,1000)ypmin,yemin,ygmin,ye2min !             **** by HZ
+        write(98,1001)iphotext,temperat,exlumth
+        write(98,1001)iphotext2,x1,x2,xbr,beta1,beta2,extph0
+        write(98,1003)isyn, iprsyn, issa
+        write(98,1003)icompt, ikn, igg, ianni, iesc, ipsc      
       end if
 
 
 
 !     LIMITS FOR THE PARTICLE ENERGY ARRAYS -- NOT TO BE CHANGED
-        gpexmn=1./(1.*npdec)
-	iprcl=0
+      gpexmn=1./(1.*npdec)
+      iprcl=0
 
-	gpmin=10.**gpexmn
-	gpmax=10.**gpexmx	
-	gemin=gpmin
-	gemax=100.*gpmax
+      gpmin=10.**gpexmn
+      gpmax=10.**gpexmx
+      gemin=gpmin
+      gemax=100.*gpmax
 
-	
-!       total number of bins for the protons/electron arrays
-	np=int(npdec*log10(1.01*gpmax))
-	ne=int(npdec*log10(1.01*gemax))
-	
-!       logarithmic step for particle and photon arrays
-        deltap=log(gpmax/gpmin)/real(np-1)
-	deltax=2.*deltap
-	
-!       change in the binning of the photon array for high B.
-        if(bfield.GT.1.E2)then    
-          abin = int(log10(bfield/1.E2))+1
-          xmin=q*gemin**2./(10**abin)
-          else
-	  xmin=q*gemin**2.
-        end if
-	xlmin=log(xmin)
-	xl10min=log10(xmin)
-	
-!       determine the dimension of the photon array NG
-	do n=1,3*ne
-	 x(n)=exp(xlmin+(n-1)*deltax)
-	 if (x(n).gt.gemax) then
-	 ng=n-1
-	 goto 300
-	 endif 
-        enddo
-300     continue
-	xmax=x(ng)
-!         ntot=np+ne+ng+1+ne+np	!nt!N
-        ntot=np+ne+ng+1
+
+!     total number of bins for the protons/electron arrays
+      np=int(npdec*log10(1.01*gpmax))
+      ne=int(npdec*log10(1.01*gemax))
+
+!     logarithmic step for particle and photon arrays
+      deltap=log(gpmax/gpmin)/real(np-1)
+      deltax=2.*deltap
+
+!     change in the binning of the photon array for high B.
+      if(bfield.GT.1.E2)then    
+        abin = int(log10(bfield/1.E2))+1
+        xmin=q*gemin**2./(10**abin)
+      else
+        xmin=q*gemin**2.
+      end if
+      xlmin=log(xmin)
+      xl10min=log10(xmin)
+
+!     determine the dimension of the photon array NG
+      do n=1,3*ne
+        x(n)=exp(xlmin+(n-1)*deltax)
+        if (x(n).gt.gemax) then
+          ng=n-1
+          goto 300
+        endif 
+      enddo
+
+300   continue
+      xmax=x(ng)
+!      ntot=np+ne+ng+1+ne+np	!nt!N
+
+!     ntot=np+ne+ng+1
+      ntot=np+ne+ng+ne+1 !                                   **** by HZ
 
       write (6,*) 'Np=',np
       write (6,*) 'Ne=',ne
@@ -232,9 +251,10 @@
       write(6,7000)gpmin,gpmax,gemax
       write(6,7001)xmin,xmax
 
+
 7000  format(1x,'min/max limits for protons and electrons:',3(g12.5,1x))
 7001  format(1x,'min/max limits for photons:',2(g12.5,1x))
-
+      
 
 !     INITIALIZATION OF THE PARTICLE ARRAYS
       yp(1)=ypmin*log(10.)
@@ -243,28 +263,36 @@
       y(np+ne)=ye(ne)
       yg(ng)=ygmin*log(10.)
       y(np+ne+ng)=yg(ng)
+      ye2(ne)=ye2min*log(10.) !                              **** by HZ
+      y(np+ne+ng+ne)=ye2(ne) !                               **** by HZ
       gp(np)=gpmax
       ge(ne)=gemax
+      ge2(ne)=gemax !                                        **** by HZ
 
 
 !     background protons/neutrons
       do n=1,np
-         gp(n)=gpmin*(gpmax/gpmin)**(real(n-1)/real(np-1))
-         yp(n)=(-slpinj)*log(gp(n)/gp(1))+ypmin*log(10.)-20.         
-         y(n)=yp(n)         
-         ygamma(n)=gp(n)
+        gp(n)=gpmin*(gpmax/gpmin)**(real(n-1)/real(np-1))
+        yp(n)=(-slpinj)*log(gp(n)/gp(1))+ypmin*log(10.)-20.         
+        y(n)=yp(n)         
+        ygamma(n)=gp(n)
       enddo
 
 !     background electrons/muons/pions/kaons     
       do n=ne-1,1,-1
-         ge(n)=gemin*(gemax/gemin)**(real(n-1)/real(ne-1))
-         ye(n)=(ne-n)*sleinj*deltap + ye(ne)
-         y(n+np)=ye(n)        
+        ge(n)=gemin*(gemax/gemin)**(real(n-1)/real(ne-1))
+        ge2(n)=ge(n) !                                       **** by HZ
+        ye(n)=(ne-n)*sleinj*deltap+ye(ne)
+!        ye2(n)=ye2(ne) !                                     **** by HZ
+        ye2(n)=ye(n)
+        y(n+np)=ye(n)
+        y(n+ne+np+ng)=ye2(n) !                               **** by HZ
       enddo 
          
-	 do n=1,ne
-	 ygamma(np+n)=ge(n)
-	 enddo 
+      do n=1,ne
+        ygamma(np+n)=ge(n)
+        ygamma(np+ne+ng+n)=ge2(n) !                          **** by HZ
+      enddo 
       
 !     background photons 
 !     ygbb: the external photon field dimensionless number density
@@ -274,128 +302,125 @@
 
 !!!   external photons with blackbody (BB) energy spectrum 
       if(iphotext.eq.1)then 
-      sum=0.
-      do n=1,ng
-         yg(n)=-slginj*log(x(n)/x(ng)) + yg(ng)
-	 ygbb(n)=yg(n)-20.
-            if (x(n).gt.30.*xbb) goto 301  
-	bbnorm=45.*yglbb/pi**4./xbb**4./xnorm 
- 	ygbb(n)=log(bbnorm*x(n)**2./(exp(x(n)/xbb)-1.))
-	sum=sum+deltax*x(n)**2.*exp(ygbb(n))
-301     continue  
-	y(np+ne+n)=log(exp(yg(n))+exp(ygbb(n))) 
+        sum=0.
+        do n=1,ng
+          yg(n)=-slginj*log(x(n)/x(ng)) + yg(ng)
+          ygbb(n)=yg(n)-20.
+          if (x(n).gt.30.*xbb) goto 301  
+          bbnorm=45.*yglbb/pi**4./xbb**4./xnorm 
+          ygbb(n)=log(bbnorm*x(n)**2./(exp(x(n)/xbb)-1.))
+          sum=sum+deltax*x(n)**2.*exp(ygbb(n))
+301       continue  
+          y(np+ne+n)=log(exp(yg(n))+exp(ygbb(n))) 
         enddo
-	endif
-	
-!!!     external photons with broken power law (BPL) spectrum 
-        if(iphotext2.eq.1) then
+      endif
+
+!!!   external photons with broken power law (BPL) spectrum 
+      if(iphotext2.eq.1) then
         sum=0.
         do  n=1,ng
-        yg(n)=-slginj*log(x(n)/x(ng)) + yg(ng)
-        ygbb(n)=yg(n)-20.
-           if(x(n).ge.x1.and.x(n).le.xbr)then
-           ygbb(n)=log(x(n)**(-beta1)/xnorm)
-           elseif(x(n).gt.xbr.and.x(n).le.x2)then
-           ygbb(n)=log(xbr**(beta2-beta1)*x(n)**(-beta2)/xnorm)
-           end if
-        sum=sum+deltax*x(n)**2.*exp(ygbb(n))
+          yg(n)=-slginj*log(x(n)/x(ng)) + yg(ng)
+          ygbb(n)=yg(n)-20.
+          if(x(n).ge.x1.and.x(n).le.xbr)then
+            ygbb(n)=log(x(n)**(-beta1)/xnorm)
+          elseif(x(n).gt.xbr.and.x(n).le.x2)then
+            ygbb(n)=log(xbr**(beta2-beta1)*x(n)**(-beta2)/xnorm)
+          end if
+          sum=sum+deltax*x(n)**2.*exp(ygbb(n))
         enddo
-!      find correct normalization for BPL 
-       bbnorm=3*extph0/(xnorm*sum) !! correction from code comparison project -- 27/04/2020 !!
-       sum=0.
-!      add to the photon bg the BPL field with correct normalization       
-       do n=1,ng
-       yg(n)=-slginj*log(x(n)/x(ng)) + yg(ng)
-       ygbb(n)=yg(n)-20.
-       if (x(n).gt.3.d0*x2) then
-       nbbmx=n-1
-       endif
-           if(x(n).ge.x1.and.x(n).le.xbr)then
-	   ygbb(n)=log(bbnorm*x(n)**(-beta1)/xnorm)
-	   elseif(x(n).gt.xbr.and.x(n).le.x2)then
-	   ygbb(n)=log(bbnorm*xbr**(beta2-beta1)*x(n)**(-beta2)/xnorm)
-	   endif
-       sum=sum+deltax*x(n)**2.*exp(ygbb(n))	   
-       y(np+ne+n)=log(exp(yg(n))+ exp(ygbb(n)))
-       enddo
-       endif
+!       find correct normalization for BPL 
+        bbnorm=3*extph0/(xnorm*sum) !! correction from code comparison project -- 27/04/2020 !!
+        sum=0.
+!       add to the photon bg the BPL field with correct normalization       
+        do n=1,ng
+          yg(n)=-slginj*log(x(n)/x(ng)) + yg(ng)
+          ygbb(n)=yg(n)-20.
+          if (x(n).gt.3.d0*x2) then
+            nbbmx=n-1
+          endif
+          if(x(n).ge.x1.and.x(n).le.xbr)then
+            ygbb(n)=log(bbnorm*x(n)**(-beta1)/xnorm)
+          elseif(x(n).gt.xbr.and.x(n).le.x2)then
+            ygbb(n)=log(bbnorm*xbr**(beta2-beta1)*x(n)**(-beta2)/xnorm)
+          endif
+        sum=sum+deltax*x(n)**2.*exp(ygbb(n))
+        y(np+ne+n)=log(exp(yg(n))+ exp(ygbb(n)))
+        enddo
+      endif
 
-!   no external photons	
-	if(iphotext.eq.0.and.iphotext2.eq.0)then
-	do n=1,ng
-	yg(n)=-slginj*log(x(n)/x(ng)) + yg(ng)
-	y(np+ne+n)=yg(n)
-	enddo
-	endif
-		
-	do  n=1,ng
+!     no external photons	
+      if(iphotext.eq.0.and.iphotext2.eq.0)then
+        do n=1,ng
+          yg(n)=-slginj*log(x(n)/x(ng)) + yg(ng)
+          y(np+ne+n)=yg(n)
+        enddo
+      endif
+
+      do  n=1,ng
         ygamma(np+ne+n)=x(n)
-        enddo 
+      enddo 
  
         
-	do n=1,ng
-	if (iphotext.eq.1)then
-	   if (x(n).gt.30.*xbb) then
-	   nbbmx=n-1
-	   goto 302
-	   endif
-	elseif (iphotext2.eq.1)then
-	   if (x(n).gt.3.d0*x2) then
-	   nbbmx=n-1
-	   goto 302
-	   endif
-	endif    
-        enddo
-302     continue  
+      do n=1,ng
+        if (iphotext.eq.1)then
+          if (x(n).gt.30.*xbb) then
+            nbbmx=n-1
+          goto 302
+          endif
+        elseif (iphotext2.eq.1)then
+          if (x(n).gt.3.d0*x2) then
+            nbbmx=n-1
+            goto 302
+          endif
+        endif    
+      enddo
+302   continue  
 
 ! the last point is reserved for the cool electrons (γ<=1)
-	ynecool=ye(1)  
-	y(np+ne+ng)=-200. 
-	     
- 
-! 	t=0.
-! 	iout=nsteps
-	
-	t=0.
-	iout=nsteps
+      ynecool=ye(1)  
+      ynecool2=ye2(1) !                                      **** by HZ
+      y(np+ne+ng)=-200.
 
-!      In case the program crashes:
-!             Pick up where we left off...
+      t=0.
+      iout=nsteps
 
-         if(ireadin.eq.1)then
-         read(99,*) iout,t
-         do ijk=1,ntot
-            read(99,*)y(ijk)
-	    if (ijk.le.np) y(ijk)=y(ijk)-0.0*log(10.)
-         enddo
-         end if
+!     In case the program crashes:
+!           Pick up where we left off...
+
+      if(ireadin.eq.1)then
+        read(99,*) iout,t
+        do ijk=1,ntot
+          read(99,*)y(ijk)
+          if (ijk.le.np) y(ijk)=y(ijk)-0.0*log(10.)
+        enddo
+      end if
          
-	h=(tend-t)/real(iout)
+      h=(tend-t)/real(iout)
 
 
-!       CALL TO MAIN ROUTINE FOR SOLVING THE SYSTEM OF EQUATIONS	
-	ifail=0
-	iw=nwork	
+!     CALL TO MAIN ROUTINE FOR SOLVING THE SYSTEM OF EQUATIONS	
+      ifail=0
+      iw=nwork
       call  d02ejf(t,tend,ntot,y,deriv,d02ejy,tol,relabs,out,
      $             d02ejw,work,iw,ifail)
          
  
-         if(tol.le.0)then
-                      print*,' warning, no change in solution'
-                      tol=abs(tol)
-         end if
+      if(tol.le.0)then
+        print*,' warning, no change in solution'
+        tol=abs(tol)
+      end if
          
-         if(ifail.ne.0) goto 303
+      if(ifail.ne.0) goto 303
 
-         print*,' integration complete to t=',tend
-         call cpu_time(t_stop)
-         write(*,*) 'Elapsed CPU time [s] = ', t_stop-t_start
-         call itime(tarray)
-         tt2=tarray(1)*3600.+tarray(2)*60.+tarray(3)
-         write(*,*) 'Elapsed wallclock time [s] = ', tt2-tt1
+      print*,' integration complete to t=',tend
+      call cpu_time(t_stop)
+      write(*,*) 'Elapsed CPU time [s] = ', t_stop-t_start
+      call itime(tarray)
+      tt2=tarray(1)*3600.+tarray(2)*60.+tarray(3)
+      write(*,*) 'Elapsed wallclock time [s] = ', tt2-tt1
       stop
 
-!                   diagnostics for failed D02... call
+!     diagnostics for failed D02... call
  
 303   continue
 
@@ -403,7 +428,7 @@
       write(6,6201)ntot
       
       do n=1,ntot
-         write(6,6202)yg(n),y(n)
+        write(6,6202)yg(n),y(n)
       enddo
 
 1000  format(1x,6(1pe12.4,1x))
@@ -438,8 +463,9 @@
      
       DIMENSION y(ntotal)
       DIMENSION yp(npmax),ye(npmax),yg(npmax),zd(npmax)
-     $         ,gp(npmax),x(npmax),ygamma(ntotal),ge(npmax)
-     $	       ,ygbb(npmax)
+     $         ,gp(npmax),x(npmax),ygamma(ntotal),ge(npmax),ygbb(npmax)
+     $         ,ge2(npmax),ye2(npmax) !                      **** by HZ
+
 
       common/param/tb,q,gpmax,
      $  deltap,deltax,np,ne,ntot,ng
@@ -450,135 +476,164 @@
       common/tfl/xnorm
       common/fqq/nsteps,nout,ireadin
       common/ebb/ygbb,nbbmx
-      common/pyy/tauth 
+!     common/pyy/tauth
+      common/pyy/tauth,tauth2 !                              **** by HZ
       common/xuu/xen,gmax
       common/pgp/radius,xl10min,bfield
  
 
       do n=1,np
-	 gp(n)=ygamma(n) 
-         yp(n)=y(n)
+        gp(n)=ygamma(n) 
+        yp(n)=y(n)
       enddo
 
       do n=1,ne
-	 ge(n)=ygamma(np+n) 
-         ye(n)=y(np+n)
+        ge(n)=ygamma(np+n) 
+        ye(n)=y(np+n)
+        ge2(n)=ygamma(np+ne+ng+n) !                          **** by HZ
+        ye2(n)=y(np+ne+ng+n) !                               **** by HZ
       enddo
 
       do n=1,ng
         x(n)=ygamma(np+ne+n) 
-	if (x(n).lt.0.1) zd(n)=1.
-	if (x(n).ge.0.1.and.x(n).le.1.) zd(n)=(1.-x(n))/.9
-	if (x(n).gt.1.) zd(n)=0.
-        yg(n)=y(np+ne+n)-log(1.+tauth*zd(n)/3.)
+        if (x(n).lt.0.1) zd(n)=1.
+        if (x(n).ge.0.1.and.x(n).le.1.) zd(n)=(1.-x(n))/.9
+        if (x(n).gt.1.) zd(n)=0.
+!       yg(n)=y(np+ne+n)-log(1.+tauth*zd(n)/3.)
+        yg(n)=y(np+ne+n)-log(1.+(tauth+tauth2)*zd(n)/3.) !   **** by HZ     
       enddo
-	
 
 !  the one before last bin is reserved for the cooled electrons
-        ynecool=ye(1) 
+      ynecool=ye(1)
+      ynecool2=ye2(1)        !                               **** by HZ
 !  measure of the Thomson optical depth on cold electrons	
-	tauth=exp(ynecool) 
-	
+      tauth=exp(ynecool)
+      tauth2=exp(ynecool2)   !                               **** by HZ
+
 ! writes solution in the dum_r4.dat file. The code picks up from this point.
-         rewind 99
-         write(99,*)iout+1,t
-         do  ijk=1,ntot
-            write(99,*)y(ijk)
-         enddo
+      rewind 99
+      write(99,*)iout+1,t
+      do  ijk=1,ntot
+        write(99,*)y(ijk)
+      enddo
 
 !  sump is a measure of the energy density in protons
 !  sumnp is a measure of the density in protons
 !  sume is a measure of the energy density in electrons
 !  send is a measure of the density in electrons
+!  sume2 is a measure of the energy density in free electrons **** by HZ
+!  send2 is a measure of the density in free electrons        **** by HZ
 !  sumx is a measure of the energy density in photons
 !  sxnd is is a measure of the density in photons
 
-	   sump=0.
-	   sumnp=0.
-	   sume=0.
-	   send=0.
-           sumx=0.
-	   sxnd=0. 
-	   
-	do k=1,np
-	   if (k.eq.1.or.k.eq.np) then
-	      fact=.5
-		else 
-	      fact=1.
-	   end if	  
-	   sump=sump+fact*deltap*gp(k)**2.*exp(yp(k))
-           sumnp=sumnp+fact*deltap*gp(k)*exp(yp(k))
-        enddo
+      sump=0.
+      sumnp=0.
+      sume=0.
+      send=0.
+      sume2=0.
+      send2=0.
+      sumx=0.
+      sxnd=0. 
+   
+      do k=1,np
+        if (k.eq.1.or.k.eq.np) then
+          fact=.5
+        else 
+          fact=1.
+        end if  
+        sump=sump+fact*deltap*gp(k)**2.*exp(yp(k))
+        sumnp=sumnp+fact*deltap*gp(k)*exp(yp(k))
+      enddo
 
-        do k=1,ne
-            if (k.eq.1.or.k.eq.ne) then
-	      fact=.5
-		else 
-	      fact=1.
-	   end if 
-	   sume=sume+fact*deltap*ge(k)**2.*exp(ye(k))
-	   send=send+deltap*ge(k)*exp(ye(k))
-        enddo 
+      do k=1,ne
+        if (k.eq.1.or.k.eq.ne) then
+          fact=.5
+        else 
+          fact=1.
+        end if 
+        sume=sume+fact*deltap*ge(k)**2.*exp(ye(k))
+        send=send+deltap*ge(k)*exp(ye(k))
+        sume2=sume2+fact*deltap*ge2(k)**2.*exp(ye2(k)) !      **** by HZ
+        send2=send2+deltap*ge2(k)*exp(ye2(k)) !               **** by HZ
+      enddo 
         
-	 do k=1,ng
-	   if (k.eq.1.or.k.eq.ng) then
-	      fact=.5
-		else 
-	      fact=1.
-	   end if 
-	   sumx=sumx+fact*deltax*x(k)**2.*exp(yg(k))
-	   sxnd=sxnd+fact*deltax*x(k)*exp(yg(k))
-        enddo 
-           xen=sumx*xnorm  
+      do k=1,ng
+        if (k.eq.1.or.k.eq.ng) then
+          fact=.5
+        else 
+          fact=1.
+        end if 
+        sumx=sumx+fact*deltax*x(k)**2.*exp(yg(k))
+        sxnd=sxnd+fact*deltax*x(k)*exp(yg(k))
+      enddo 
+      xen=sumx*xnorm  
 
-      write (6,1000) t,sump,xen,tauth
-      write (90,1000) t,sump,xen,tauth 
-      write (98,1000) t,sump,sume,sumnp,send,sxnd
+!     write (6,1000) t,sump,xen,tauth
+      write (6,1000) t,sump,xen,tauth,tauth2 !                **** by HZ
+!     write (90,1000) t,sump,xen,tauth
+      write (90,1000) t,sump,xen,tauth,tauth2 !               **** by HZ
+!     write (98,1000) t,sump,sume,sumnp,send,sxnd
+      write (98,1000) t,sump,sume,sume2,sumnp,send,send2,sxnd!**** by HZ
       write (72,1000) t,log10(xen)
       write (73,1000) t,log10(ratmpe*sump) 
-      
-      write (81,1000) t,sump,xen,tauth	
-	do n=1,ng	
-	if(exp(yg(n))-exp(ygbb(n)).gt.0.)then
-        write (71,1000) log10(x(n)),
-     $  log10(xnorm*(exp(yg(n))-exp(ygbb(n)))*x(n)**2),
-     $  log10(xnorm*exp(ygbb(n))*x(n)**2)
-	else
-    	write (71,1000) log10(x(n)),log10(xnorm*(exp(yg(n)))*x(n)**2),
-     $	log10(xnorm*exp(ygbb(n))*x(n)**2)
-	endif
-	write (81,1000) log10(x(n)),log10(xnorm*exp(yg(n))*x(n)**2)	
-        enddo
+ 
+!     write (81,1000) t,sump,xen,tauth     
+      write (81,1000) t,sump,xen,tauth,tauth2 !               **** by HZ
+      do n=1,ng
+        if(exp(yg(n))-exp(ygbb(n)).gt.0.)then
+          write (71,1000) log10(x(n)),
+     $      log10(xnorm*(exp(yg(n))-exp(ygbb(n)))*x(n)**2),
+     $      log10(xnorm*exp(ygbb(n))*x(n)**2)
+        else
+          write (71,1000) log10(x(n)),log10(xnorm*(exp(yg(n)))*x(n)**2),
+     $      log10(xnorm*exp(ygbb(n))*x(n)**2)
+        endif
+        write (81,1000) log10(x(n)),log10(xnorm*exp(yg(n))*x(n)**2)
+      enddo
 
-      write (88,1000) t,sump,xen,tauth
-	do n=1,np
-        write (88,1000) log10(gp(n)), log10(gp(n)**2*exp(yp(n)))
-        enddo 
-        
-      write (89,1000) t,sump,xen,tauth
-	do n=1,ne
-        write (89,1000) log10(ge(n)), log10(ge(n)**2*exp(ye(n)))
-        enddo  
-	
-      
-      
-	do n=1,ntot
-	if (n.lt.ntot) then
-	  if (n.le.np+ne) then
-	    tau=0.
-	    else
-	    tau=tauth*zd(n-np-ne)/3.
-	  end if
-	endif
-        enddo
+!     write (88,1000) t,sump,xen,tauth
+      write (87,1000) t,sump,xen,tauth,tauth2 !               **** by HZ
+      do n=1,np
+        write (87,1000) log10(gp(n)), log10(gp(n)**2*exp(yp(n)))
+      enddo 
 
-	t=tend-real(iout)*h
-	iout=iout-1
-	
-1000  format(1x,6(1pe12.4,1x))
-	return
-	end
-	
+!     write (89,1000) t,sump,xen,tauth
+      write (88,1000) t,sump,xen,tauth,tauth2 !               **** by HZ
+      do n=1,ne
+        write (88,1000) log10(ge(n)), log10(ge(n)**2*exp(ye(n)))
+      enddo
+
+      write (89,1000) t,sump,xen,tauth,tauth2 !               **** by HZ
+      do n=1,ne !                                             **** by HZ
+        write (89,1000) log10(ge2(n)), log10(ge2(n)**2*exp(ye2(n))) 
+                                                            ! **** by HZ
+      enddo !                                                 **** by HZ
+      
+      do n=1,ntot
+        if (n.lt.ntot) then 
+!         if ((n.le.np+ne)) then
+          if ((n.le.np+ne).or.(n.gt.np+ne+ng)) then !         **** by HZ
+            tau=0.
+          else
+!           tau=tauth*zd(n-np-ne)/3.
+            tau=(tauth+tauth2)*zd(n-np-ne)/3. !               **** by HZ
+          end if
+        endif
+      enddo
+
+!      t=tend-real(iout)*h
+      if(iout == nsteps) then
+        t = 1e-10
+      else
+        t = t * 2.0
+      endif
+      iout=iout-1
+
+!1000 format(1x,6(1pe12.4,1x))
+1000  format(1x,8(1pe12.4,1x)) !                             **** by HZ
+      return
+      end
+
 **************************************************************************
 
       subroutine deriv(time,y,yprime)
@@ -602,6 +657,8 @@
      $         ,csth(npmax),denkn(npmax),zd(npmax),relann(npmax)
      $         ,sst(npmax),extelin(npmax),extprinxp(npmax)
      $         ,syncprph(npmax),syncpr(npmax)
+     $         ,ge2(npmax),ye2(npmax),extelin2(npmax) !      **** by HZ
+     $         ,syncel2(npmax),syncph2(npmax),accelf(npmax) !**** by HZ
       DIMENSION  yggal(npmax),yggcral(npmax)
      $   ,anng(npmax),annel(npmax)
      $   ,ggabsr(npmax),gginje(npmax)    
@@ -623,320 +680,407 @@
      $ ap,iprext,ipexp  
       common/elexterbr/geextbr,slelints1,slelints2,ae2,ielextbr  
       common/prexterbr/gpextbr,slprints1,slprints2,ap2,iprextbr       
-      common/ebb/ygbb,nbbmx 
-      common/pyy/tauth 
+      common/ebb/ygbb,nbbmx
+!     common/pyy/tauth
+      common/pyy/tauth,tauth2 !                              **** by HZ
       common/xuu/xen,gmax
       common/tvv/iprcl  
       common/fqq/nsteps,nout,ireadin
       common/pgp/radius,xl10min,bfield
- 
-	iprcl=iprcl+1 
+      common/elefree/ge2inj,qefree,tfesc,gprimeacc, !        **** by HZ
+     $ ielefree,iaccfree,isynfree,ielefesc !                 **** by HZ 
+      iprcl=iprcl+1
       
       do n=1,np
-	 gp(n)=ygamma(n) 
-         yp(n)=y(n)
-      enddo 
-
-      do n=1,ne
-	 ge(n)=ygamma(np+n) 
-         ye(n)=y(np+n)
+        gp(n)=ygamma(n) 
+        yp(n)=y(n)
       enddo
 
-	gemin=ge(1)
-	gemax=ge(ne)
+      do n=1,ne
+        ge(n)=ygamma(np+n)
+        ye(n)=y(np+n)
+        ge2(n)=ygamma(np+ne+ng+n) !                          **** by HZ
+        ye2(n)=y(np+ne+ng+n) !                               **** by HZ
+      enddo
+
+      gemin=ge(1)
+      gemax=ge(ne)
 
       do n=1,ng
-	 x(n)=ygamma(np+ne+n) 
-         yg(n)=y(np+ne+n)
-	if (x(n).lt..1) zd(n)=1.
-	if (x(n).ge..1.and.x(n).le.1.) zd(n)=(1.-x(n))/.9
- 	if (x(n).gt.1.) zd(n)=0.
-        enddo
-	zd(ng)=0.
+        x(n)=ygamma(np+ne+n) 
+        yg(n)=y(np+ne+n)
+        if (x(n).lt..1) zd(n)=1.
+        if (x(n).ge..1.and.x(n).le.1.) zd(n)=(1.-x(n))/.9
+        if (x(n).gt.1.) zd(n)=0.
+      enddo
+      zd(ng)=0.
  
 !  the one before last bin is reserved for the cooled electrons
-        ynecool=ye(1) 
+      ynecool=ye(1) 
+      ynecool2=ye2(1) !                                      **** by HZ
 !  measure of the Thomson optical depth on cold electrons	
-	tauth=exp(ynecool) 
-	if (iprcl.eq.1) then
-	n=np+ne+ng+1+ne+np	!N
-	yinit(n)=y(n)
-	endif
+      tauth=exp(ynecool) 
+      tauth2=exp(ynecool2) !                                 **** by HZ
+      if (iprcl.eq.1) then
+        n=np+ne+ng+1+ne+np    !N
+        yinit(n)=y(n)
+      endif
 
 !!! RATES OF PHYSICAL PROCESSES !!!
 
 !! PROTON INJECTION 
-        call prinj(gp,yp,np,deltap,extprinxp,sumprinj)
+      call prinj(gp,yp,np,deltap,extprinxp,sumprinj)
 !! ELECTRON INJECTION
-        call elinj(ge,ye,ne,deltap,extelin,sumelinj)        
+      call elinj(ge,ye,ne,deltap,extelin,sumelinj)        
+!! FREE ELECTRON INJECTION !                                 **** by HZ
+      call elinj2(ge2,ye2,ne,deltap,extelin2,sumelinj2) !    **** by HZ
+!! FREE ELECTRON ACCELERATION !                              **** by HZ
+      if(iaccfree.eq.1) then !                               **** by HZ
+        call elfreeacc(ge2,ye2,ne,deltap,accelf,sumaccelf) ! **** by HZ
+      endif !                                                **** by HZ
 !! SYNCHROTRON RADIATION
-        if(isyn.eq.1) then
+      if(isyn.eq.1) then
 ! i) electron loss   
         call synecool(ge,ye,syncel,sumsyncel)
 ! ii) photons from electron synchrotron
         call synephot(ge,ye,x,yg,syncph,sumsyncph)
-        endif 
-        if(iprsyn.eq.1) then
+      endif
+      if(isynfree.eq.1) then !                               **** by HZ
+! i+) free electron loss !                                   **** by HZ
+        call synecool(ge2,ye2,syncel2,sumsyncel2) !          **** by HZ
+! ii+) photons from free electron synchrotron !              **** by HZ
+        call synephot(ge2,ye2,x,yg,syncph2,sumsyncph2) !     **** by HZ
+      endif !                                                **** by HZ
+      if(iprsyn.eq.1) then
 ! iii) proton losses
         call synpcool(gp,yp,syncpr,sumsyncpr)
 ! iv) photons from proton synchrotron        
         call synpphot(gp,yp,x,yg,syncprph,sumsyncprph)
-        endif 
+      endif 
 !! SYNCHROTRON SELF ABSORPTION
-        if(issa.eq.1) then
+      if(issa.eq.1) then
 ! photon loss (attenuation)
         call ssaphot(ge,ye,x,yg,sst,sumphssa)
-        else 
+      else 
         do n=1,ng
-        sst(n) = 0
+          sst(n) = 0
         enddo 
-        endif 
+      endif 
 !! INVERSE COMPTON SCATTERING (ICS)        
-        if (icompt.eq.1) then
+      if (icompt.eq.1) then
 ! electron loss
         call compe_sim(x,ge,ye,yg,ikn,csth,cskn,sumcsth,
      $ sumcskn,taukn) 
 ! photons from electron ICS using Bloumenthal-Gould emissivity
         call compph_bg(x,ge,yg,ye,gcsth,sumgcsth)
-        else 
+      else 
         
-        do n=1,ne
+      do n=1,ne
         csth(n) = 0
         cskn(n) = 0
-        enddo 
+      enddo 
         
-        do n=1,ng
+      do n=1,ng
         gcsth(n) = 0
-        enddo 
+      enddo 
         
-        endif
+      endif
 !! PHOTON-PHOTON PAIR PRODUCTION
-        if (igg.eq.1) then 
+      if (igg.eq.1) then 
 ! photon attenuation
         call ggphot(x,yg,ggabsr,sumggabs)       
 ! electron/positron injection 
         call ggelec(x,yg,ge,ye,gginje,sumggabs,sumgginj)  
-        endif 
+      endif 
         
 !!! THE EQUATIONS !!!
-!       derivatives computed at first bin
+!!    derivatives computed at first bin
 
-!       protons:
-        yprime(1)=extprinxp(1)-iesc*bpresc+syncpr(1)*iprsyn
-!       electrons:
-        yprime(np+1)=extelin(1)-iesc*belesc+syncel(1)*isyn+
-     $  (csth(1) - cskn(1))*icompt + igg*gginje(1) 
-!       photons:
- 	yprime(np+ne+1)=-ipsc*1./(1.+tauth*zd(1)/3.)+
-     $	isyn*syncph(1) + iprsyn*syncprph(1)+ issa*sst(1) +
-     $  icompt*gcsth(1) -igg*ggabsr(1)   
-!       cold electrons: 
-	pycsth=4./3.*xnorm*gdens(1)*(gp(1)**2.-1.)*exp(ye(1))/tauth
-	pysyn= 4./3.*tb*(gp(1)**2.-1.)*exp(ye(1))/tauth
-        yprime(np+ne+ng+1)= pycsth+pysyn+taukn
-     $    -3.*tauth/32.-belesc	     
- !       derivatives computed at last bin
+!     protons:
+      yprime(1)=extprinxp(1)-iesc*bpresc+syncpr(1)*iprsyn
+!     electrons:
+      yprime(np+1)=extelin(1)-iesc*belesc+syncel(1)*isyn+
+     $ (csth(1) - cskn(1))*icompt + igg*gginje(1)
+     $ + 0.0*ielefesc/tfesc/ge2(1) !                         **** by HZ
+!     free electrons: !                                      **** by HZ
+      yprime(np+ne+ng+1)=extelin2(1)+syncel2(1)*isynfree !   **** by HZ
+     $ - 0.0*ielefesc/tfesc/ge2(1)-iaccfree*accelf(1) !      **** by HZ
+!     photons:
+!     yprime(np+ne+1)=-ipsc*1./(1.+tauth*zd(1)/3.)+
+      yprime(np+ne+1)=-ipsc*1./(1.+(tauth+tauth2)*zd(1)/3.)+!**** by HZ
+     $ isyn*syncph(1) + iprsyn*syncprph(1)+ issa*sst(1) +
+     $ icompt*gcsth(1) -igg*ggabsr(1)
+     $ + isynfree * syncph2(1) !                             **** by HZ
+!     cold electrons: 
+!     pycsth=4./3.*xnorm*gdens(1)*(gp(1)**2.-1.)*exp(ye(1))/tauth
+      pycsth=4./3.*xnorm*gdens(1)*(gp(1)**2.-1.)*exp(ye(1)) !**** by HZ 
+     $ /(tauth+tauth2) !                                     **** by HZ
+!     pysyn= 4./3.*tb*(gp(1)**2.-1.)*exp(ye(1))/tauth
+      pysyn= 4./3.*tb*(gp(1)**2.-1.)*exp(ye(1)) !            **** by HZ
+     $ /(tauth+tauth2) !                                     **** by HZ
+!     yprime(np+ne+ng+1)= pycsth+pysyn+taukn
+      yprime(np+ne+ng+ne+1)= pycsth+pysyn+taukn
+!    $ -3.*tauth/32.-belesc     
+     $ -3.*(tauth+tauth2)/32.-belesc !                       **** by HZ
 
-!       protons: 
-	yprime(np)=-.1
-!       yprime(np)=extprinxp(np)-bpresc+syncpr(np)*isyn	
-        if (y(np).lt.-150.) yprime(np)=0.
-!       electrons:
-	yprime(np+ne)=-.1
-!       yprime(np+1)=extelin(ne)-belesc+syncel(ne)*isyn	
-!        photons:
-        yprime(np+ne+ng)=-ipsc*1./(1+tauth*zd(ng)/3.)+   
-     $	isyn*syncph(ng) +iprsyn*syncprph(ng) +issa*sst(ng) +
-     $  icompt*gcsth(ng) -igg*ggabsr(ng) 
+!!    derivatives computed at last bin
+
+!     protons: 
+      yprime(np)=-.1
+!     yprime(np)=extprinxp(np)-bpresc+syncpr(np)*isyn	
+      if (y(np).lt.-150.) yprime(np)=0.
+!     electrons:
+      yprime(np+ne)=-.1
+!     yprime(np+1)=extelin(ne)-belesc+syncel(ne)*isyn	
+!     free electrons: !                                      **** by HZ
+      yprime(np+ne+ng+ne)=-.1 !                              **** by HZ
+!     photons:
+      yprime(np+ne+ng)=-ipsc*1./(1+tauth*zd(ng)/3.)+   
+     $ isyn*syncph(ng) +iprsyn*syncprph(ng) +issa*sst(ng) +
+     $ icompt*gcsth(ng) -igg*ggabsr(ng) 
+     $ + isynfree*syncph2(ng) !                              **** by HZ
 
 ***************************
 
-!       derivatives computed at all other bins 
+!     derivatives computed at all other bins 
 
-	sumprot=0.
-	
+      sumprot=0.
+
 !! PROTONS 
-	do n=2,np-1!    
+      do n=2,np-1!    
 ! protons	
-	yprime(n)=extprinxp(n)-iesc*bpresc+iprsyn*syncpr(n)
-
+        yprime(n)=extprinxp(n)-iesc*bpresc+iprsyn*syncpr(n)
         sumprot=sumprot+deltap*gp(n)**2.*exp(yp(n))*yprime(n)
-
-        enddo 
-    
-        sumelec=0.
+      enddo 
+   
+      sumelec=0.
      
 !! electrons       
-        do n=2, ne-1 
+      do n=2, ne-1
+        if (exp(ge(n)) < ge2inj) then
+          factor = 0.0
+        else
+          factor = 1.0
+        endif
         yprime(np+n)=extelin(n)-iesc*belesc+
-     $  isyn*syncel(n)+
-     $  icompt*(csth(n) - cskn(n)) +
-     $  igg*gginje(n) 
-	sumelec=sumelec+deltap*ge(n)**2.*exp(ye(n))*yprime(np+n)
-        enddo 
-  	
+     $   isyn*syncel(n)+
+     $   icompt*(csth(n) - cskn(n)) +
+     $   igg*gginje(n)
+     $   + factor*ielefesc*exp(ye2(n))/tfesc/ge(n)/exp(ye(n))! **** by HZ
+
+        sumelec=sumelec+deltap*ge(n)**2.*exp(ye(n))*yprime(np+n)
+      enddo 
+
+      sumelec2=0. !                                          **** by HZ
+
+!! free electrons                                            **** by HZ
+      do n=2, ne-1 !                                         **** by HZ
+        if (exp(ge2(n)) < ge2inj) then
+          factor = 0.0
+        else
+          factor = 1.0
+        endif
+        yprime(np+ne+ng+n)=extelin2(n)+isynfree*syncel2(n) ! **** by HZ
+     $   -factor*ielefesc/tfesc/ge2(n)-iaccfree*accelf(n) !  **** by HZ
+        sumelec2=sumelec2+deltap*ge2(n)**2.*exp(ye2(n)) !    **** by HZ
+     $   *yprime(np+ne+ng+n) !                               **** by HZ
+      enddo !                                                **** by HZ
+
 ************************
 !   PHOTONS
-	
-	sumphot=0.
 
-	do n=1,ng-1
-   
-	yprime(np+ne+n)=-ipsc*1./(1.+tauth*zd(n)/3.) +
-     $	isyn*syncph(n) +iprsyn*syncprph(n) +issa*sst(n) +
-     $  icompt*gcsth(n) -igg*ggabsr(n)
+      sumphot=0.
+
+      do n=1,ng-1
+!       yprime(np+ne+n)=-ipsc*1./(1.+tauth*zd(n)/3.) +
+        yprime(np+ne+n)=-ipsc*1./(1.+(tauth+tauth2)*zd(n)/3.) +!* by HZ 
+     $   isyn*syncph(n) +iprsyn*syncprph(n) +issa*sst(n) +
+     $   icompt*gcsth(n) -igg*ggabsr(n)
+     $   + isynfree*syncph2(n) !                             **** by HZ
   
         sumphot=sumphot+deltax*x(n)**2.*xnorm*exp(yg(n))*yprime(np+ne+n)
 
 ! treatment of external photon field     
-        if ((iphotext2.eq.1.and.x(n).le.x2.and.x(n).ge.x1).
-     $  or.(n.le.nbbmx.and.iphotext.eq.1)) then
-	if (ygbb(n).gt.yg(n)) then
-           yprime(np+ne+n)=-1./(1.+tauth*zd(n)/3.) + exp(ygbb(n)-yg(n))
-	else
-           yprime(np+ne+n)=yprime(np+ne+n)+exp(ygbb(n)-yg(n))
-        endif
+        if((iphotext2.eq.1.and.x(n).le.x2.and.x(n).ge.x1).
+     $    or.(n.le.nbbmx.and.iphotext.eq.1)) then
+          if(ygbb(n).gt.yg(n)) then
+!           yprime(np+ne+n)=-1./(1.+tauth*zd(n)/3.) + exp(ygbb(n)-yg(n))
+            yprime(np+ne+n)=-1./(1.+(tauth+tauth2)*zd(n)/3.)!**** by HZ
+     $       + exp(ygbb(n)-yg(n)) !                          **** by HZ
+          else
+            yprime(np+ne+n)=yprime(np+ne+n)+exp(ygbb(n)-yg(n))
+          endif
         endif 
-        enddo
+      enddo
         
 
-	yprime(np+ne+ng)=0.
-	
+      yprime(np+ne+ng)=0.
+
 ! compute photon number density and photon energy density (dimensionless)	
-        sumx=0.
-	sumtx=0.
-	 do k=1,ng
-	   if (k.eq.1.or.k.eq.ng) then
-	      fact=.5
-		else 
-	      fact=1.
-	   end if
-	   sumx=sumx+fact*deltax*x(k)**2.*exp(yg(k))	
-	   tau=tauth*zd(k)/3.
-	   sumtx=sumtx+fact*deltax*x(k)**2.*exp(yg(k))/(1.+tau)	
-        enddo 
-	xden=xnorm*sumx !-bblnum
-	xdten=xnorm*sumtx !-bblnum/(1.+tauth/3.) 
+      sumx=0.
+      sumtx=0.
+      do k=1,ng
+        if(k.eq.1.or.k.eq.ng) then
+          fact=.5
+        else 
+          fact=1.
+        end if
+        sumx=sumx+fact*deltax*x(k)**2.*exp(yg(k))
+!       tau=tauth*zd(k)/3.
+        tau=(tauth+tauth2)*zd(k)/3. !                        **** by HZ
+        sumtx=sumtx+fact*deltax*x(k)**2.*exp(yg(k))/(1.+tau)
+      enddo 
+      xden=xnorm*sumx !-bblnum
+      xdten=xnorm*sumtx !-bblnum/(1.+tauth/3.) 
 
     
-      if(ireadin.eq.0.and.iprcl.eq.1)then ! BEGIN warnings for initial background choice  
+      if(ireadin.eq.0.and.iprcl.eq.1) then ! BEGIN warnings for initial background choice  
         ypremx=abs(yprime(np+1))
+        ypremx2=abs(yprime(np+ne+ng+1)) !                    **** by HZ
         yprpmx=abs(yprime(1))
         yprgmx=abs(yprime(np+ne+1))
 
-	nemx=1
-	npmx=1
-	ngmx=1
+        nemx=1
+        nemx2=1 !                                            **** by HZ
+        npmx=1
+        ngmx=1
 
-	do n=1, np
-	if(yprpmx.lt.abs(yprime(n)))then
-	yprpmx=yprime(n)
-	npmx=n
-	endif
-	enddo
-			
-	do n=1, ne
-	if(ypremx.lt.abs(yprime(np+n)))then
-	ypremx=yprime(np+n)
-	nemx=n
-	endif
-	enddo
+        do n=1, np
+          if(yprpmx.lt.abs(yprime(n)))then
+            yprpmx=yprime(n)
+            npmx=n
+          endif
+        enddo
+
+        do n=1, ne
+          if(ypremx.lt.abs(yprime(np+n)))then
+            ypremx=yprime(np+n)
+            nemx=n
+          endif
+          if(ypremx2.lt.abs(yprime(np+ne+ng+n)))then !       **** by HZ
+            ypremx2=yprime(np+ne+ng+n) !                     **** by HZ
+            nemx2=n !                                        **** by HZ
+          endif !                                            **** by HZ
+        enddo
         
         do n=1, ng
-	if(yprgmx.lt.abs(yprime(np+ne+n)))then
-	yprgmx=yprime(np+ne+n)
-	ngmx=n
-	endif
-	enddo
-	
+          if(yprgmx.lt.abs(yprime(np+ne+n)))then
+            yprgmx=yprime(np+ne+n)
+            ngmx=n
+          endif
+        enddo
+
         if(yprpmx.lt.1d10) then
-        write(6,*) 'WARNING: low proton derivative',
-     $  yprpmx, ' at bin',npmx,' of proton array'
-        write(6,*) 'consider changing proton bg'
+          write(6,*) 'WARNING: low proton derivative',
+     $      yprpmx, ' at bin',npmx,' of proton array'
+          write(6,*) 'consider changing proton bg'
 !         stop
         elseif(yprpmx.gt.1d16)then
-        write(6,*) 'WARNING: high proton derivative',
-     $  yprpmx, ' at bin',npmx,' of proton array'
-        write(6,*) 'consider changing proton bg'
+          write(6,*) 'WARNING: high proton derivative',
+     $      yprpmx, ' at bin',npmx,' of proton array'
+          write(6,*) 'consider changing proton bg'
         endif 
         
         
         if(ypremx.lt.1d10) then
-        write(6,*) 'WARNING: low electron derivative',
-     $  ypremx, ' at bin',nemx,' of electron array'
-        write(6,*) 'consider changing electron bg'
+          write(6,*) 'WARNING: low electron derivative',
+     $      ypremx, ' at bin',nemx,' of electron array'
+          write(6,*) 'consider changing electron bg'
 !         stop
         elseif(ypremx.gt.1d16)then
-        write(6,*) 'WARNING: high electron derivative',
-     $  ypremx, ' at bin',nemx,' of electron array'
-        write(6,*) 'consider changing electron bg'        
+          write(6,*) 'WARNING: high electron derivative',
+     $      ypremx, ' at bin',nemx,' of electron array'
+          write(6,*) 'consider changing electron bg'        
         endif 
-        
+
+        if(ypremx2.lt.1d10) then !                           **** by HZ
+          write(6,*) 'WARNING: low free electron derivative',!*** by HZ
+     $      ypremx2, ' at bin',nemx2,' of free electron array'!** by HZ
+          write(6,*) 'consider changing free electron bg' !  **** by HZ
+!         stop !                                             **** by GZ
+        elseif(ypremx2.gt.1d16)then !                        **** by HZ
+          write(6,*) 'WARNING: high free electron derivative',!** by HZ
+     $      ypremx2, ' at bin',nemx2,' of free electron array'!** by HZ
+          write(6,*) 'consider changing free electron bg' !  **** by HZ
+        endif !                                              **** by HZ
+ 
         if(yprgmx.lt.1d10) then
-        write(6,*) 'WARNING: low photon derivative',
-     $  ypremx, ' at bin',ngmx,' of photon array'
-        write(6,*) 'consider changing photon bg'
+          write(6,*) 'WARNING: low photon derivative',
+     $      ypremx, ' at bin',ngmx,' of photon array'
+          write(6,*) 'consider changing photon bg'
 !         stop
         elseif(yprgmx.gt.1d16)then
-        write(6,*) 'WARNING: high photon derivative',
-     $  yprgmx, ' at bin',ngmx,' of photon array'
-        write(6,*) 'consider changing photon bg'        
+          write(6,*) 'WARNING: high photon derivative',
+     $      yprgmx, ' at bin',ngmx,' of photon array'
+          write(6,*) 'consider changing photon bg'        
         endif 
         
       endif    ! END of warnings for initial background choice    
        
-	yprmax=abs(yprime(1))
-	nmx=1
+      yprmax=abs(yprime(1))
+      nmx=1
 
-	do n=1,np+ne+ng+1+ne+np		!nt
-	if (yprmax.lt.abs(yprime(n))) then
-	yprmax=abs(yprime(n))
-	nmx=n
-	endif
-        enddo
-
-        sumptotl=0.
-        
-	do ik=1,10000
-
-            if (ik*nout.eq.iprcl) then
-	sumptotl=sumelpio+sumgrpio+sumntpio+sumnepio
-     $  +summpio
-	sumpioloss=sumptotl/sumprpio
-C  Output on screen:
-        write(6,1009) 
-        write(6,*) 'step, time, bin of max deriv, max deriv'
-	write (6,1400) iprcl,time,nmx,yprime(nmx)
-	write(6,*) 'Thomson opt depth, photon compactness'
-	write(6,1000) tauth, xden
-	write(6,*) 'injection compactness: p,e,B'
-	write (6,1000) exlumpr, exlumel,tb 
-	write (6,*) 'total energy rates: p, e, g'
-	write (6,1000) sumprot*ratmpe,sumelec,sumphot
-	if(isyn.eq.1)then
-	write (6,*) 'e-syn: loss, gain'
-	write (6,1000) sumsyncel,sumsyncph
-	endif
-	if(iprsyn.eq.1)then
-	write (6,*) 'p-syn: loss, gain'	
-	write (6,1000) sumsyncpr*ratmpe, sumsyncprph
-	endif
-	if(icompt.eq.1)then
-        write (6,*) 'e-ICS: Th loss, KN loss, tot loss, tot gain'
-        write (6,1000) sumcsth,sumcskn,sumcsth+sumcskn, sumgcsth
+!     do n=1,np+ne+ng+1+ne+np   !nt
+      do n=1,np+ne+ng+ne+1 !                                 **** by HZ
+        if (yprmax.lt.abs(yprime(n))) then
+          yprmax=abs(yprime(n))
+          nmx=n
         endif
-        if(igg.eq.1)then
-	write (6,*) 'gg->ee: loss, gain'	        
-     	write (6,1000) sumggabs,sumgginj
-     	endif 
-     	if(ianni.eq.1)then 
-        write (6,*) 'ee->g: loss, gain'
-	write (6,1000) sumelann,sumanng
-        endif 
+      enddo
+     
+!      do ik=1,10000
+
+!        if (ik*nout.eq.iprcl) then
+         if(mod(iprcl, nout).eq.0) then
+C  Output on screen:
+          write(6,1009) 
+          write(6,*) 'step, time, bin of max deriv, max deriv'
+          write (6,1400) iprcl,time,nmx,yprime(nmx)
+!         write(6,1000)ye2(10),ye2(13),ye2(14),ye2(20),ye2(40),ye2(75)
+!         write(6,1000)ye(10),ye(20),ye(75)
+          write(6, *) 'ntot, np, ne, ng'
+          write(6,1500) ntot, np, ne, ng
+          write(6,*) 'Thomson opt depth, photon compactness'
+          write(6,1000) tauth, tauth2, xden
+          write(6,*) 'injection compactness: p,e,B'
+          write (6,1000) exlumpr, exlumel,tb 
+!         write (6,*) 'total energy rates: p, e, g'
+          write (6,*) 'total energy rates: p, e, e_f, g' !   **** by HZ
+!         write (6,1000) sumprot*ratmpe,sumelec,sumphot
+          write (6,1000) sumprot*ratmpe,sumelec,sumelec2,sumphot !by HZ
+          if(iaccfree.eq.1)then !                            **** by HZ
+            write (6,*) 'e_f-acc: gain' !                    **** by HZ
+            write (6,1000) sumaccelf !                       **** by HZ
+          endif !                                            **** by HZ
+          if(isyn.eq.1)then
+            write (6,*) 'e-syn: loss, gain'
+            write (6,1000) sumsyncel,sumsyncph
+          endif
+          if(isynfree.eq.1)then !                            **** by HZ
+            write (6,*) 'e_f-syn: loss, gain' !              **** by HZ
+            write (6,1000) sumsyncel2,sumsyncph2 !           **** by HZ
+          endif !                                            **** by HZ
+          if(iprsyn.eq.1)then
+            write (6,*) 'p-syn: loss, gain'
+            write (6,1000) sumsyncpr*ratmpe, sumsyncprph
+          endif
+          if(icompt.eq.1)then
+            write (6,*) 'e-ICS: Th loss, KN loss, tot loss, tot gain'
+            write (6,1000) sumcsth,sumcskn,sumcsth+sumcskn, sumgcsth
+          endif
+          if(igg.eq.1)then
+            write (6,*) 'gg->ee: loss, gain'        
+            write (6,1000) sumggabs,sumgginj
+          endif 
+          if(ianni.eq.1)then 
+            write (6,*) 'ee->g: loss, gain'
+            write (6,1000) sumelann,sumanng
+          endif 
 ! !  Output on file:     
-            endif
-        enddo 
-	
+        endif
+!      enddo 
+
+1500  format(1x,4(i5,1x))
 1400  format(1x,i10,1x,1pe12.4,i5,1x,1pe12.4,1x,e12.4,1x,e12.4,1x,e12.4
      1    ,1x,e12.4)
 1300  format(1x,1pe12.4,i5,1x,i5,1x,i5,2x,e12.4,2x,e12.4)
@@ -945,32 +1089,32 @@ C  Output on screen:
 1010  format('loss (%) via: e, g, ν, n, μ',1x,6(1pe12.4,1x))
 1009  format(/)
 
-	do 377 i=1,ntot
-	   if( y(i).gt.1. .or. y(i).le.1.)then
-              continue
-           else
-         print*,'overflow!!! i=',i,' y(i)=',y(i)
-         call cpu_time(t_stop)
-         write(*,*) 'Elapsed CPU time [s] = ', t_stop-t_start
-         call itime(tarray)
-         tt2=tarray(1)*3600.+tarray(2)*60.+tarray(3)
-         write(*,*) 'Elapsed wallclock time [s] = ', tt2-tt1         
-         stop
-           end if
-	   if( yprime(i).gt.1. .or. yprime(i).le.1.)then
-              continue
-           else
-         print*,'overflow!!! i=',i,' yprime(i)=',yprime(i)
-         call cpu_time(t_stop)
-         write(*,*) 'Elapsed CPU time [s] = ', t_stop-t_start
-         call itime(tarray)
-         tt2=tarray(1)*3600.+tarray(2)*60.+tarray(3)
-         write(*,*) 'Elapsed wallclock time [s] = ', tt2-tt1
-         stop
-           end if
-377      continue
+      do 377 i=1,ntot
+        if( y(i).gt.1. .or. y(i).le.1.)then
+          continue
+        else
+          print*,'overflow!!! i=',i,' y(i)=',y(i)
+          call cpu_time(t_stop)
+          write(*,*) 'Elapsed CPU time [s] = ', t_stop-t_start
+          call itime(tarray)
+          tt2=tarray(1)*3600.+tarray(2)*60.+tarray(3)
+          write(*,*) 'Elapsed wallclock time [s] = ', tt2-tt1         
+          stop
+        end if
+        if( yprime(i).gt.1. .or. yprime(i).le.1.)then
+          continue
+        else
+          print*,'overflow!!! i=',i,' yprime(i)=',yprime(i)
+          call cpu_time(t_stop)
+          write(*,*) 'Elapsed CPU time [s] = ', t_stop-t_start
+          call itime(tarray)
+          tt2=tarray(1)*3600.+tarray(2)*60.+tarray(3)
+          write(*,*) 'Elapsed wallclock time [s] = ', tt2-tt1
+          stop
+        end if
+377     continue
 
-	tprev=time
+      tprev=time
 
       return
       end
@@ -983,63 +1127,63 @@ C  Output on screen:
       integer ipexp
 !     PHYSICAL CONSTANTS        
       PARAMETER(sthom=6.65e-25,c=3.e10,elrms=1.6e-12*.511e6,
-     $ prms=1.6e-12*938.257e6, 
-     $ pi=3.14159265,boltz=1.38e-16,astbo=7.56e-15,Bcr=4.4e13) 
+     $  prms=1.6e-12*938.257e6, 
+     $  pi=3.14159265,boltz=1.38e-16,astbo=7.56e-15,Bcr=4.4e13) 
       DIMENSION gp(np),yp(np),extprinxp(np)
      
       common/prexter/gpextmn,gpextmx,slprints,exlumpr,bpresc,
-     $ap,iprext,ipexp
+     $  ap,iprext,ipexp
       common/prexterbr/gpextbr,slprints1,slprints2,ap2,iprextbr 
 
 ! sumprinj: energy injected into protons   
       sumprinj=0.
       if (iprext.eq.1) then
-	 slpr=slprints
-         q2=(gpextmx**(2.-slpr)-gpextmn**(2.-slpr))/(2.-slpr)
-         qextpr=3.*exlumpr/q2
-         do n=1,np 
-        if(ipexp.eq.0) then
-        if (gp(n).ge.gpextmn.and.gp(n).lt.gpextmx) then !if ipexp=0
-        extprinxp(n)=qextpr/exp(yp(n))*gp(n)**(-slprints)
-     $  *exp(-(gp(n)/gpextmx)**ap)**ipexp
-         else
-        extprinxp(n)=0.
-        endif
-        endif
-        if(ipexp.eq.1) then
-	if (gp(n).ge.gpextmn) then !if ipexp=1
-        extprinxp(n)=qextpr/exp(yp(n))*gp(n)**(-slprints)
-     $  *exp(-(gp(n)/gpextmx)**ap)**ipexp
-        else
-        extprinxp(n)=0.
-        endif 
-        endif
-       sumprinj=sumprinj+deltap*gp(n)**2.*exp(yp(n))*extprinxp(n)
-!        write(6,1000) gp(n), extprinxp(n), sumprinj, ap, ipexp
-         enddo         
+        slpr=slprints
+        q2=(gpextmx**(2.-slpr)-gpextmn**(2.-slpr))/(2.-slpr)
+        qextpr=3.*exlumpr/q2
+        do n=1,np 
+          if(ipexp.eq.0) then
+            if (gp(n).ge.gpextmn.and.gp(n).lt.gpextmx) then !if ipexp=0
+              extprinxp(n)=qextpr/exp(yp(n))*gp(n)**(-slprints)
+     $         *exp(-(gp(n)/gpextmx)**ap)**ipexp
+            else
+              extprinxp(n)=0.
+            endif
+          endif
+          if(ipexp.eq.1) then
+            if (gp(n).ge.gpextmn) then !if ipexp=1
+              extprinxp(n)=qextpr/exp(yp(n))*gp(n)**(-slprints)
+     $          *exp(-(gp(n)/gpextmx)**ap)**ipexp
+            else
+              extprinxp(n)=0.
+            endif 
+          endif
+          sumprinj=sumprinj+deltap*gp(n)**2.*exp(yp(n))*extprinxp(n)
+!         write(6,1000) gp(n), extprinxp(n), sumprinj, ap, ipexp
+        enddo         
       endif
   
       if (iprextbr.eq.1) then
- 	 slpr1=slprints1
-	 slpr2=slprints2     
-	 qp21=(gpextbr**(2.-slpr1)-gpextmn**(2.-slpr1))/(2.-slpr1)
-         qp22=(gpextmx**(2.-slpr2)-gpextbr**(2.-slpr2))/(2.-slpr2)
-	 fogp=gpextbr**(slpr1-slpr2)
-	 qextpr=3.*exlumpr/(fogp*qp21+qp22)
-	 do n=1,np
-	 if (gp(n).ge.gpextmn.and.gp(n).le.gpextmx) then
-	   if (gp(n).lt.gpextbr) then
-	   extprinxp(n)=fogp*qextpr/exp(yp(n))*gp(n)**(-slpr1)
-	   else
-	 extprinxp(n)=qextpr/exp(yp(n))*gp(n)**(-slpr2)
-     $   *exp(-(gp(n)/gpextmx)**ap2)**ipexp
-	   end if  
-         else
-         extprinxp(n)=0.
-         endif        
-        sumprinj=sumprinj+deltap*gp(n)**2.*exp(yp(n))*extprinxp(n)
+        slpr1=slprints1
+        slpr2=slprints2     
+        qp21=(gpextbr**(2.-slpr1)-gpextmn**(2.-slpr1))/(2.-slpr1)
+        qp22=(gpextmx**(2.-slpr2)-gpextbr**(2.-slpr2))/(2.-slpr2)
+        fogp=gpextbr**(slpr1-slpr2)
+        qextpr=3.*exlumpr/(fogp*qp21+qp22)
+        do n=1,np
+          if (gp(n).ge.gpextmn.and.gp(n).le.gpextmx) then
+            if (gp(n).lt.gpextbr) then
+              extprinxp(n)=fogp*qextpr/exp(yp(n))*gp(n)**(-slpr1)
+            else
+              extprinxp(n)=qextpr/exp(yp(n))*gp(n)**(-slpr2)
+     $          *exp(-(gp(n)/gpextmx)**ap2)**ipexp
+            end if  
+          else
+            extprinxp(n)=0.
+          endif        
+          sumprinj=sumprinj+deltap*gp(n)**2.*exp(yp(n))*extprinxp(n)
 !         write(6,1000) gp(n), extprinxp(n), sumprinj
-         enddo	
+        enddo
       endif 
       
       return 
@@ -1059,66 +1203,125 @@ C  Output on screen:
       DIMENSION ge(ne),ye(ne),extelin(ne)
       
       common/elexter/geextmn,geextmx,slelints,exlumel,belesc,
-     $ae,ielext,ieexp  
+     $ ae,ielext,ieexp  
       
       common/elexterbr/geextbr,slelints1,slelints2,ae2,ielextbr
 
 ! sumelinj: energy injected into electrons    
       sumelinj=0.
 
-      if (ielext.eq.1) then
-         slel=slelints
-         q2=(geextmx**(2.-slel)-geextmn**(2.-slel))/(2.-slel)
-         qextel=3.*exlumel/q2
-         do n=1,ne  
-         if(ieexp.eq.0) then 
-         if(ge(n).ge.geextmn.and.ge(n).le.geextmx)then !if ieexp=0
-        extelin(n)=qextel/exp(ye(n))*ge(n)**(-slel)
-     $  *exp(-(ge(n)/geextmx)**ae)**ieexp
-         else
-         extelin(n)=0.
-         endif
-         endif 
-         if(ieexp.eq.1) then 
-	if (ge(n).ge.geextmn) then !if ieexp=1
-        extelin(n)=qextel/exp(ye(n))*ge(n)**(-slel)
-     $  *exp(-(ge(n)/geextmx)**ae)**ieexp
-         else
-         extelin(n)=0.
-         endif
-         endif 
-       sumelinj=sumelinj+deltap*ge(n)**2.*exp(ye(n))*extelin(n)
+      if(ielext.eq.1) then
+        slel=slelints
+        q2=(geextmx**(2.-slel)-geextmn**(2.-slel))/(2.-slel)
+        qextel=3.*exlumel/q2
+        do n=1,ne  
+          if(ieexp.eq.0) then 
+            if(ge(n).ge.geextmn.and.ge(n).le.geextmx)then !if ieexp=0
+              extelin(n)=qextel/exp(ye(n))*ge(n)**(-slel)
+     $         *exp(-(ge(n)/geextmx)**ae)**ieexp
+            else
+              extelin(n)=0.
+            endif
+          endif 
+          if(ieexp.eq.1) then 
+            if(ge(n).ge.geextmn) then !if ieexp=1
+              extelin(n)=qextel/exp(ye(n))*ge(n)**(-slel)
+     $         *exp(-(ge(n)/geextmx)**ae)**ieexp
+            else
+              extelin(n)=0.
+            endif
+          endif 
+          sumelinj=sumelinj+deltap*ge(n)**2.*exp(ye(n))*extelin(n)
 !         write(6,1000) log10(ge(n)), extelin(n)
-         enddo         
+        enddo         
       endif 
        
-      if (ielextbr.eq.1) then
-	 slel1=slelints1
-	 slel2=slelints2    
-         q21=(geextbr**(2.-slel1)-geextmn**(2.-slel1))/(2.-slel1)
-         q22=(geextmx**(2.-slel2)-geextbr**(2.-slel2))/(2.-slel2)
-         fog=geextbr**(slel1-slel2)
-	 qextel=3.*exlumel/(fog*q21+q22)
-	 do n=1,ne
-	 if (ge(n).ge.geextmn.and.ge(n).le.geextmx) then
-	   if (ge(n).lt.geextbr) then
-	   extelin(n)=fog*qextel/exp(ye(n))*ge(n)**(-slel1)
-	   else
-	 extelin(n)=qextel/exp(ye(n))*ge(n)**(-slel2)
-     $   *exp(-(ge(n)/geextmx)**ae2)**ieexp
-	   end if  
-         else
-         extelin(n)=0.
-         endif        
-        sumelinj=sumelinj+deltap*ge(n)**2.*exp(ye(n))*extelin(n)
-!        write(6,1000) ge(n), extelin(n), sumelinj
-         enddo	
+      if(ielextbr.eq.1) then
+        slel1=slelints1
+        slel2=slelints2    
+        q21=(geextbr**(2.-slel1)-geextmn**(2.-slel1))/(2.-slel1)
+        q22=(geextmx**(2.-slel2)-geextbr**(2.-slel2))/(2.-slel2)
+        fog=geextbr**(slel1-slel2)
+        qextel=3.*exlumel/(fog*q21+q22)
+        do n=1,ne
+          if(ge(n).ge.geextmn.and.ge(n).le.geextmx) then
+            if(ge(n).lt.geextbr) then
+              extelin(n)=fog*qextel/exp(ye(n))*ge(n)**(-slel1)
+            else
+              extelin(n)=qextel/exp(ye(n))*ge(n)**(-slel2)
+     $         *exp(-(ge(n)/geextmx)**ae2)**ieexp
+            end if  
+          else
+            extelin(n)=0.
+          endif        
+          sumelinj=sumelinj+deltap*ge(n)**2.*exp(ye(n))*extelin(n)
+!         write(6,1000) ge(n), extelin(n), sumelinj
+        enddo
       endif 
       
       return 
 1000  format(1x,6(1pe12.4,1x))   
       end       
-    
+
+*************************************************************************
+
+!!    FREE ELECTRON INJECTION !                              **** by HZ
+      subroutine elinj2(ge2,ye2,ne,deltap,extelin2,sumelinj2)
+      parameter (npmax=400,ntotal=800)
+      implicit real*8(a-h,o-z)
+      DIMENSION ge2(ne),ye2(ne),extelin2(ne)
+
+      common/elefree/ge2inj,qefree,tfesc,gprimeacc,
+     $ ielefree,iaccfree,isynfree,ielefesc
+
+      sumelinj2=0.
+
+      if(ielefree.eq.1) then
+        do n=1,ne
+          if((ge2(n).le.ge2inj).and.((ge2(n)*ge2(2)/ge2(1)).gt.ge2inj))
+     $     then
+            extelin2(n)=qefree/exp(ye2(n))
+!            write(6,1000) extelin2(n),exp(ye2(n))!!!!!!!!!!!!!!
+!            write(6,*) '*****************************'
+          else
+            extelin2(n)=0.
+          endif
+          sumelinj2=sumelinj2+deltap*ge2(n)**2.*exp(ye2(n))*extelin2(n)
+        enddo
+      endif
+
+      return
+1000  format(1x,6(1pe12.4,1x))
+      end
+
+************************************************************************
+
+!!    FREE ELECTRON ACCELERATION !                              **** by HZ
+      subroutine elfreeacc(ge2,ye2,ne,deltap,accelf,sumaccelf)
+      parameter (npmax=400,ntotal=800)
+      implicit real*8(a-h,o-z)
+!     PHYSICAL CONSTANTS        
+      PARAMETER(sthom=6.65e-25,c=3.e10,elrms=1.6e-12*.511e6,
+     $ prms=1.6e-12*938.257e6,
+     $ pi=3.14159265,boltz=1.38e-16,astbo=7.56e-15,Bcr=4.4e13)
+      DIMENSION ge2(ne),ye2(ne),accelf(ne)
+
+      common/elefree/ge2inj,qefree,tfesc,gprimeacc,
+     $ ielefree,iaccfree,isynfree,ielefesc
+
+! sumaccelf: energy gain by free electrons 
+      sumaccelf=0.
+      accelf(n) = 0;
+      do n=2,ne-1
+        accdf=gprimeacc*(exp(ye2(n))-exp(ye2(n-1)))
+        accelf(n)=accdf/deltap/ge2(n)/(exp(ye2(n))*.5+exp(ye2(n-1))*.5)
+        sumaccelf= sumaccelf+deltap*ge2(n)**2.*accelf(n)*exp(ye2(n))
+      enddo
+
+      return
+1000  format(1x,6(1pe12.4,1x))
+      end
+
 *************************************************************************    
 
 !!    ELECTRON SYNCHROTRON LOSSES
@@ -1135,14 +1338,14 @@ C  Output on screen:
      $  ,deltap,deltax,np,ne,ntot,ng
       
 ! sumsyncel: energy lost by electrons in synchrotron
-	sumsyncel=0.
+      sumsyncel=0.
 
-	do n=1,ne-1 
-	syndf=(ge(n+1)**2.-1.)*exp(ye(n+1))-(ge(n)**2.-1.)*exp(ye(n))
-	syncel(n)=4.*tb*syndf/deltap/ge(n)/exp(ye(n))/3.
+      do n=1,ne-1 
+        syndf=(ge(n+1)**2.-1.)*exp(ye(n+1))-(ge(n)**2.-1.)*exp(ye(n))
+        syncel(n)=4.*tb*syndf/deltap/ge(n)/exp(ye(n))/3.
         sumsyncel= sumsyncel+deltap*ge(n)**2.*syncel(n)*exp(ye(n))
-        enddo
-        return
+      enddo
+      return
       end         
 *************************************************************************
 
@@ -1221,7 +1424,7 @@ C  Output on screen:
        common/param/tb,q,gpmax
      $  ,deltap,deltax,np,ne,ntot,ng
        common/tfl/xnorm 
-       common/pyy/tauth 
+       common/pyy/tauth,tauth2 
 
        call densityold(x,ge,yg,ne,ng,deltax,gdens,denkn)
        
@@ -1331,35 +1534,35 @@ C  Output on screen:
       common/param/tb,q,gpmax
      $  ,deltap,deltax,np,ne,ntot,ng
       common/tfl/xnorm 
-	
+
 ! sumsyncph: energy injected in photons by electron synchrotron losses
-	sumsyncph=0.
+      sumsyncph=0.
 
-        do n=1,ng
-	sumsy(n)=0.
+      do n=1,ng
+        sumsy(n)=0.
 ! for each photon energy we form the ratio x/xcrit
-            do m=1,ne
-! 	xsycr=1.5*ge(m)**2.*q
-	xsycr=1.5*(ge(m)**2.-1.)*q !19/11/20
-	ysycr=x(n)/xsycr
-            if (ysycr.gt.30.) then
-	fsyval=0.
-	  else
-	fsyval=fsynch(ysycr)/4./pi
-            end if
-	sumsy(n)=sumsy(n)+deltap*ge(m)*exp(ye(m))*
-     $  (4.*sqrt(3.)*tb/q/x(n))*fsyval/xnorm/exp(yg(n))
-            enddo 
-        enddo
+        do m=1,ne
+! 	  xsycr=1.5*ge(m)**2.*q
+          xsycr=1.5*(ge(m)**2.-1.)*q !19/11/20
+          ysycr=x(n)/xsycr
+          if(ysycr.gt.30.) then
+            fsyval=0.
+          else
+            fsyval=fsynch(ysycr)/4./pi
+          end if
+          sumsy(n)=sumsy(n)+deltap*ge(m)*exp(ye(m))*
+     $     (4.*sqrt(3.)*tb/q/x(n))*fsyval/xnorm/exp(yg(n))
+        enddo 
+      enddo
 
-	do n=1,ng
-	syncph(n)=sumsy(n)
-	sumsyncph = sumsyncph +
-     $    deltax*xnorm*x(n)**2.*exp(yg(n))*syncph(n)	
-        enddo
-        return
+      do n=1,ng
+        syncph(n)=sumsy(n)
+        sumsyncph = sumsyncph +
+     $   deltax*xnorm*x(n)**2.*exp(yg(n))*syncph(n)
+      enddo
+      return
 1000  format(1x,6(1pe12.4,1x))          
-        end 
+      end 
 *************************************************************************
 
 !!    PHOTON INJECTION FROM PROTON SYNCHROTRON
@@ -1943,4 +2146,3 @@ C
 
 
 *************************************************************************
-      
