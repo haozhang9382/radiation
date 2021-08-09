@@ -108,7 +108,7 @@
       call itime(tarray)
       tt1=tarray(1)*3600.+tarray(2)*60.+tarray(3)
  
-      open (unit=13, file='code_hao.inp', status='old')
+      open (unit=13, file='input.inp', status='old')
       open (unit=98, file='code_r4.dat', status='unknown')       
       open (unit=99, file='dum_r4.dat', status='unknown') 
 
