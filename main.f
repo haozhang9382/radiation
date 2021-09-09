@@ -59,7 +59,7 @@
       integer iphotext, iphotext2
       integer isyn,icompt,igg,issa,iesc,ipsc
       integer ianni
-      integer ielefree,isynfree,ielefesc,iaccfree !          **** by HZ
+      integer ielefree,isynfree,ielefesc,iaccfree,icomtfree,iknfree ! **** by HZ
       integer tarray
       real*8 npdec
       character*1 relabs
@@ -107,13 +107,13 @@
       common/tvv/iprcl 
       common/pgp/radius,xl10min,bfield
       common/elefree/ge2inj,qefree,tfesc,gprimeacc, !        **** by HZ
-     $ ielefree,iaccfree,isynfree,ielefesc !                 **** by HZ
+     $ ielefree,iaccfree,isynfree,ielefesc,icomptfree,iknfree! **** by HZ
 
       call cpu_time (t_start)
       call itime(tarray)
       tt1=tarray(1)*3600.+tarray(2)*60.+tarray(3)
  
-      open (unit=13, file='code_hao.inp', status='old')
+      open (unit=13, file='input.inp', status='old')
       open (unit=98, file='code_r4.dat', status='unknown')       
       open (unit=99, file='dum_r4.dat', status='unknown') 
 
@@ -134,7 +134,7 @@
       read (13,*) isyn,iprsyn,issa 
       read (13,*) icompt,ikn,igg,ianni,iesc,ipsc
       read (13,*) ielefree,isynfree,ge2inj,qefree,ielefesc, !**** by HZ
-     $ tfesc,iaccfree,frecn !                                **** by HZ 
+     $ tfesc,iaccfree,frecn,icomptfree,iknfree !             **** by HZ 
       if (ielextbr.gt.0) ielext=0      
       if (iprextbr.gt.0) iprext=0
 
@@ -195,7 +195,9 @@
         write(98,1001)iphotext2,x1,x2,xbr,beta1,beta2,extph0
         write(98,1003)isyn, iprsyn, issa
         write(98,1003)icompt, ikn, igg, ianni, iesc, ipsc      
-      end if
+        write(98,1003)ielefree,isynfree,ge2inj,qefree,ielefesc, !**** by HZ
+     $ tfesc,iaccfree,frecn,icomptfree,iknfree !             **** by HZ
+        end if
 
 
 
@@ -480,7 +482,8 @@
       common/pyy/tauth,tauth2 !                              **** by HZ
       common/xuu/xen,gmax
       common/pgp/radius,xl10min,bfield
- 
+      common/elefree/ge2inj,qefree,tfesc,gprimeacc, !        **** by HZ
+     $ ielefree,iaccfree,isynfree,ielefesc,icomptfree,iknfree! **** by HZ 
 
       do n=1,np
         gp(n)=ygamma(n) 
@@ -659,6 +662,8 @@
      $         ,syncprph(npmax),syncpr(npmax)
      $         ,ge2(npmax),ye2(npmax),extelin2(npmax) !      **** by HZ
      $         ,syncel2(npmax),syncph2(npmax),accelf(npmax) !**** by HZ
+     $         ,cskn2(npmax),csth2(npmax),gcsth2(npmax) !    **** by HZ
+     $         ,gcskn2(npmax)
       DIMENSION  yggal(npmax),yggcral(npmax)
      $   ,anng(npmax),annel(npmax)
      $   ,ggabsr(npmax),gginje(npmax)    
@@ -667,8 +672,8 @@
       
       common/param/tb,q,gpmax,
      $ deltap,deltax,np,ne,ntot,ng
-      common/flags/isyn,iprsyn,icompt,igg
-     $  ,issa,iesc,ipsc,ianni,ikn 
+      common/flags/isyn,iprsyn,icompt,igg !       **** by HZ
+     $  ,issa,iesc,ipsc,ianni,ikn
       common/ygm/ygamma 
       common/tfl/xnorm
       common/nonlin/factor      
@@ -688,7 +693,7 @@
       common/fqq/nsteps,nout,ireadin
       common/pgp/radius,xl10min,bfield
       common/elefree/ge2inj,qefree,tfesc,gprimeacc, !        **** by HZ
-     $ ielefree,iaccfree,isynfree,ielefesc !                 **** by HZ 
+     $ ielefree,iaccfree,isynfree,ielefesc,icomptfree,iknfree !**** by HZ 
       iprcl=iprcl+1
       
       do n=1,np
@@ -785,6 +790,25 @@
       enddo 
         
       endif
+!! INVERSE COMPTON SCATTERING (ICS)        
+      if (icomptfree.eq.1) then
+! electron loss
+        call compe_sim(x,ge2,ye2,yg,iknfree,csth2,cskn2,sumcsth2,
+     $ sumcskn2,taukn2)
+! photons from electron ICS using Bloumenthal-Gould emissivity
+        call compph_bg(x,ge2,yg,ye2,gcsth2,sumgcsth2)
+      else
+
+      do n=1,ne2
+        csth2(n) = 0 !                  **** by HZ
+        cskn2(n) = 0
+      enddo
+
+      do n=1,ng
+        gcsth2(n) = 0
+      enddo
+
+      endif
 !! PHOTON-PHOTON PAIR PRODUCTION
       if (igg.eq.1) then 
 ! photon attenuation
@@ -805,11 +829,12 @@
 !     free electrons: !                                      **** by HZ
       yprime(np+ne+ng+1)=extelin2(1)+syncel2(1)*isynfree !   **** by HZ
      $ - 0.0*ielefesc/tfesc/ge2(1)-iaccfree*accelf(1) !      **** by HZ
+     $ +(csth2(1) - cskn2(1))*icomptfree
 !     photons:
 !     yprime(np+ne+1)=-ipsc*1./(1.+tauth*zd(1)/3.)+
       yprime(np+ne+1)=-ipsc*1./(1.+(tauth+tauth2)*zd(1)/3.)+!**** by HZ
      $ isyn*syncph(1) + iprsyn*syncprph(1)+ issa*sst(1) +
-     $ icompt*gcsth(1) -igg*ggabsr(1)
+     $ icompt*gcsth(1) -igg*ggabsr(1) + icomp*gcsth2(1)
      $ + isynfree * syncph2(1) !                             **** by HZ
 !     cold electrons: 
 !     pycsth=4./3.*xnorm*gdens(1)*(gp(1)**2.-1.)*exp(ye(1))/tauth
@@ -819,7 +844,7 @@
       pysyn= 4./3.*tb*(gp(1)**2.-1.)*exp(ye(1)) !            **** by HZ
      $ /(tauth+tauth2) !                                     **** by HZ
 !     yprime(np+ne+ng+1)= pycsth+pysyn+taukn
-      yprime(np+ne+ng+ne+1)= pycsth+pysyn+taukn
+      yprime(np+ne+ng+ne+1)= pycsth+pysyn+taukn+taukn2
 !    $ -3.*tauth/32.-belesc     
      $ -3.*(tauth+tauth2)/32.-belesc !                       **** by HZ
 
@@ -837,7 +862,7 @@
 !     photons:
       yprime(np+ne+ng)=-ipsc*1./(1+tauth*zd(ng)/3.)+   
      $ isyn*syncph(ng) +iprsyn*syncprph(ng) +issa*sst(ng) +
-     $ icompt*gcsth(ng) -igg*ggabsr(ng) 
+     $ icompt*gcsth(ng) -igg*ggabsr(ng) +icomptfree*gcsth2(ng)
      $ + isynfree*syncph2(ng) !                              **** by HZ
 
 ***************************
@@ -882,6 +907,7 @@
         endif
         yprime(np+ne+ng+n)=extelin2(n)+isynfree*syncel2(n) ! **** by HZ
      $   -factor*ielefesc/tfesc/ge2(n)-iaccfree*accelf(n) !  **** by HZ
+     $   +icomptfree*(csth2(n)-cskn2(n))
         sumelec2=sumelec2+deltap*ge2(n)**2.*exp(ye2(n)) !    **** by HZ
      $   *yprime(np+ne+ng+n) !                               **** by HZ
       enddo !                                                **** by HZ
@@ -895,7 +921,7 @@
 !       yprime(np+ne+n)=-ipsc*1./(1.+tauth*zd(n)/3.) +
         yprime(np+ne+n)=-ipsc*1./(1.+(tauth+tauth2)*zd(n)/3.) +!* by HZ 
      $   isyn*syncph(n) +iprsyn*syncprph(n) +issa*sst(n) +
-     $   icompt*gcsth(n) -igg*ggabsr(n)
+     $   icompt*gcsth(n) -igg*ggabsr(n)+icomptfree*gcsth2(n)
      $   + isynfree*syncph2(n) !                             **** by HZ
   
         sumphot=sumphot+deltax*x(n)**2.*xnorm*exp(yg(n))*yprime(np+ne+n)
@@ -1066,7 +1092,11 @@ C  Output on screen:
           endif
           if(icompt.eq.1)then
             write (6,*) 'e-ICS: Th loss, KN loss, tot loss, tot gain'
-            write (6,1000) sumcsth,sumcskn,sumcsth+sumcskn, sumgcsth
+            write (6,1000) sumcsth,sumcskn,sumcsth+sumcskn,sumgcsth
+          endif
+          if(icomptfree.eq.1)then
+            write (6,*) 'e_f-ICS: Th loss, KN loss, tot loss, tot gain'
+            write (6,1000) sumcsth2,sumcskn2,sumcsth2+sumcskn2,sumgcsth2
           endif
           if(igg.eq.1)then
             write (6,*) 'gg->ee: loss, gain'        
@@ -1272,7 +1302,7 @@ C  Output on screen:
       DIMENSION ge2(ne),ye2(ne),extelin2(ne)
 
       common/elefree/ge2inj,qefree,tfesc,gprimeacc,
-     $ ielefree,iaccfree,isynfree,ielefesc
+     $ ielefree,iaccfree,isynfree,ielefesc,icomptfree,iknfree
 
       sumelinj2=0.
 
@@ -1307,14 +1337,46 @@ C  Output on screen:
       DIMENSION ge2(ne),ye2(ne),accelf(ne)
 
       common/elefree/ge2inj,qefree,tfesc,gprimeacc,
-     $ ielefree,iaccfree,isynfree,ielefesc
+     $ ielefree,iaccfree,isynfree,ielefesc,icomptfree,iknfree
 
 ! sumaccelf: energy gain by free electrons 
       sumaccelf=0.
-      accelf(n) = 0;
+      accelf(n) = 0.
       do n=2,ne-1
-        accdf=gprimeacc*(exp(ye2(n))-exp(ye2(n-1)))
-        accelf(n)=accdf/deltap/ge2(n)/(exp(ye2(n))*.5+exp(ye2(n-1))*.5)
+!        if(n.le.3) then
+          accdf=gprimeacc*(exp(ye2(n))-exp(ye2(n-1)))
+!        else
+!          accdf=gprimeacc*(3.*exp(ye2(n))-4.*exp(ye2(n-1))+exp(ye2(n-2))
+!     &          )*.25
+!        endif
+!        aa=exp(ye2(n+1))-exp(ye2(n))
+!        bb=exp(ye2(n))-exp(ye2(n-1))
+!        if(aa*bb.gt.0.) then
+!          if(aa.gt.2.*bb) then
+!            a=2.*bb
+!          else
+!            a=aa
+!          endif
+!          if(2.*aa.gt.bb) then
+!            b=bb
+!          else
+!            b=2.*aa
+!          endif
+!          if(a*b.gt.0.) then
+!            if(a.gt.b) then
+!              md=a
+!            else
+!              md=b
+!            endif
+!          else
+!            md=0.
+!          endif
+!        else
+!          md=0.
+!        endif
+!        accdf=gprimeacc*md
+        accelf(n)=accdf/deltap/ge2(n)/
+     $            (exp(ye2(n))*.5+exp(ye2(n-1))*.5)
         sumaccelf= sumaccelf+deltap*ge2(n)**2.*accelf(n)*exp(ye2(n))
       enddo
 
@@ -1363,14 +1425,14 @@ C  Output on screen:
      $  ,deltap,deltax,np,ne,ntot,ng
 
 !  sumsyncpr: energy lost by protons in synchrotron
-	sumsyncpr=0.
+      sumsyncpr=0.
 
-	do n=1,np-1
-	syndf=(gp(n+1)**2.-1.)*exp(yp(n+1))-(gp(n)**2.-1.)*exp(yp(n))
-	syncpr(n)=4.*tb*syndf/deltap/gp(n)/exp(yp(n))/3./ratmpe**3.
+      do n=1,np-1
+        syndf=(gp(n+1)**2.-1.)*exp(yp(n+1))-(gp(n)**2.-1.)*exp(yp(n))
+        syncpr(n)=4.*tb*syndf/deltap/gp(n)/exp(yp(n))/3./ratmpe**3.
         sumsyncpr=sumsyncpr+deltap*gp(n)**2.*syncpr(n)*exp(yp(n))
-        enddo
-        return
+      enddo
+      return
       end
 ************************************************************************* 
 
@@ -1390,7 +1452,7 @@ C  Output on screen:
      
 !  uses delta-function approximation -- see equation (40) in Mastichiadis & Kirk (1995)
 !  sumphssa: energy absorbed in synchrotron self absorption
-        sumphssa=0.                
+       sumphssa=0.                
        do n=1,ng-1 
        if (ge(n).eq.0.) then
        sst(n)=0.
