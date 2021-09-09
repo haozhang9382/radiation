@@ -312,8 +312,7 @@
           bbnorm=45.*yglbb/pi**4./xbb**4./xnorm 
           ygbb(n)=log(bbnorm*x(n)**2./(exp(x(n)/xbb)-1.))
           sum=sum+deltax*x(n)**2.*exp(ygbb(n))
-301       continue  
-          y(np+ne+n)=log(exp(yg(n))+exp(ygbb(n))) 
+301       continue           
         enddo
       endif
 
@@ -346,7 +345,6 @@
             ygbb(n)=log(bbnorm*xbr**(beta2-beta1)*x(n)**(-beta2)/xnorm)
           endif
         sum=sum+deltax*x(n)**2.*exp(ygbb(n))
-        y(np+ne+n)=log(exp(yg(n))+ exp(ygbb(n)))
         enddo
       endif
 
@@ -586,12 +584,11 @@
         if(exp(yg(n))-exp(ygbb(n)).gt.0.)then
           write (71,1000) log10(x(n)),
      $      log10(xnorm*(exp(yg(n))-exp(ygbb(n)))*x(n)**2),
-     $      log10(xnorm*exp(ygbb(n))*x(n)**2)
+     $      log10(xnorm*exp(ygbb(n))*x(n)**2)    
         else
           write (71,1000) log10(x(n)),log10(xnorm*(exp(yg(n)))*x(n)**2),
      $      log10(xnorm*exp(ygbb(n))*x(n)**2)
         endif
-        write (81,1000) log10(x(n)),log10(xnorm*exp(yg(n))*x(n)**2)
       enddo
 
 !     write (88,1000) t,sump,xen,tauth
@@ -799,14 +796,14 @@
         call compph_bg(x,ge2,yg,ye2,gcsth2,sumgcsth2)
       else
 
-      do n=1,ne2
-        csth2(n) = 0 !                  **** by HZ
-        cskn2(n) = 0
-      enddo
+        do n=1,ne2
+          csth2(n) = 0 !                  **** by HZ
+          cskn2(n) = 0
+        enddo
 
-      do n=1,ng
-        gcsth2(n) = 0
-      enddo
+        do n=1,ng
+          gcsth2(n) = 0
+        enddo
 
       endif
 !! PHOTON-PHOTON PAIR PRODUCTION
@@ -834,8 +831,13 @@
 !     yprime(np+ne+1)=-ipsc*1./(1.+tauth*zd(1)/3.)+
       yprime(np+ne+1)=-ipsc*1./(1.+(tauth+tauth2)*zd(1)/3.)+!**** by HZ
      $ isyn*syncph(1) + iprsyn*syncprph(1)+ issa*sst(1) +
-     $ icompt*gcsth(1) -igg*ggabsr(1) + icomp*gcsth2(1)
+     $ icompt*gcsth(1) -igg*ggabsr(1) + icomptfree*gcsth2(1)
      $ + isynfree * syncph2(1) !                             **** by HZ
+
+      y(ntot+1)=(isyn*syncph(1)+isynfree*syncph2(1))*yg(1)
+      y(ntot+ng+1)=(icompt*gcsth(1)+icomptfree*gcsth2(1))*yg(1)
+
+
 !     cold electrons: 
 !     pycsth=4./3.*xnorm*gdens(1)*(gp(1)**2.-1.)*exp(ye(1))/tauth
       pycsth=4./3.*xnorm*gdens(1)*(gp(1)**2.-1.)*exp(ye(1)) !**** by HZ 
@@ -925,6 +927,10 @@
      $   + isynfree*syncph2(n) !                             **** by HZ
   
         sumphot=sumphot+deltax*x(n)**2.*xnorm*exp(yg(n))*yprime(np+ne+n)
+
+!      record the SYN and IC components
+        y(ntot+n)=(isyn*syncph(n)+isynfree*syncph2(n))*yg(n)
+        y(ntot+ng+n)=(icompt*gcsth(n)+icomptfree*gcsth2(n))*yg(n)
 
 ! treatment of external photon field     
         if((iphotext2.eq.1.and.x(n).le.x2.and.x(n).ge.x1).
@@ -1106,6 +1112,21 @@ C  Output on screen:
             write (6,*) 'ee->g: loss, gain'
             write (6,1000) sumelann,sumanng
           endif 
+ 
+          write(75, 1000) iprcl,time
+          do n=1,ng
+            if(exp(yg(n))-exp(ygbb(n)).gt.0.)then
+              write (75,1000) log10(x(n)),
+     $          log10(xnorm*(exp(yg(n))-exp(ygbb(n)))*x(n)**2),
+     $          log10(xnorm*exp(ygbb(n))*x(n)**2),
+     $          y(ntot+n),y(ntot+ng+n)
+            else
+              write (75,1000) log10(x(n)),log10(xnorm*(exp(yg(n)))*x(n)
+     $          **2),log10(xnorm*exp(ygbb(n))*x(n)**2),
+     $          y(ntot+n),y(ntot+ng+n)
+            endif
+          enddo
+
 ! !  Output on file:     
         endif
 !      enddo 
